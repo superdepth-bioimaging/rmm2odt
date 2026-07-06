@@ -63,7 +63,7 @@ on all platforms.
 ### 2. Get the code
 
 ```bash
-git clone https://github.com/<OWNER>/rmm2odt.git      # <-- replace with the repo URL
+git clone https://github.com/superdepth-bioimaging/rmm2odt.git
 cd rmm2odt
 ```
 
