@@ -144,6 +144,14 @@ $env:RMM2ODT_DATA = "C:/Users/you/rmm2odt_data"
 $env:RMM2ODT_OUT  = "C:/Users/you/rmm2odt_data/sample5_run"
 ```
 
+**Windows (Anaconda Prompt / cmd):** — use `set`, with **no quotes** and **no
+spaces** around `=` (anything after `=` becomes the value verbatim):
+
+```bat
+set RMM2ODT_DATA=C:/Users/you/rmm2odt_data
+set RMM2ODT_OUT=C:/Users/you/rmm2odt_data/sample5_run
+```
+
 Prefer editing a file instead? Copy the config and set the three `paths:`
 entries (`rrmat`, `illumination_file`, `output_root`) to absolute paths
 (forward slashes are fine on Windows too).
@@ -199,6 +207,12 @@ ls "$RMM2ODT_OUT"/render/          # the six panels (+ fig_ortho + ri_zscan.mp4)
 
 ```powershell
 dir "$env:RMM2ODT_OUT/render/"     # or open the folder in File Explorer
+```
+
+**Windows (Anaconda Prompt / cmd):**
+
+```bat
+dir "%RMM2ODT_OUT%\render"         REM or open the folder in File Explorer
 ```
 
 All outputs are organized under `output_root/` in per-stage subfolders:
