@@ -1,0 +1,17 @@
+# rmm2odt runtime dependencies (union of the three vendored stages + renderer).
+# Install into a torch env (e.g. conda `pytorch` locally / `torchgpu` on xclass).
+torch>=2.0
+numpy>=1.21
+scipy>=1.7
+h5py>=3.7
+mat73>=0.60
+scikit-image>=0.19
+opencv-python>=4.6
+tqdm>=4.64
+PyYAML>=6.0
+matplotlib>=3.5
+imageio>=2.19
+imageio-ffmpeg>=0.4
+Pillow>=9.4
+# optional:
+#   matplotlib-scalebar   # nicer scalebars (renderer falls back without it)

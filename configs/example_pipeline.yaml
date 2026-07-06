@@ -1,0 +1,81 @@
+# rmm2odt unified pipeline config
+# One file drives all four stages: rrmat -> multilayer -> GVAS -> BPM_ODT -> image.
+# Run:  python run.py --config configs/example_pipeline.yaml [--dry-run]
+# Env vars (${VAR} / ${VAR:-default}) are expanded in any string value.
+
+name: example_run
+
+# Shared optics / sampling (consumed by every stage).
+optics:
+  wavelength: 0.517          # um
+  NA: 1.0
+  n0: 1.33                   # background refractive index
+  resolution: 0.2581         # lateral pixel pitch (um/px)
+  scan_step: 1.0             # axial depth-scan step (um)
+  # NA_model: 1.0            # optional; defaults to NA
+
+paths:
+  rrmat: "/home/hoangku/data/.../rrmat.mat"           # stage-1 input (square HDF5 R-matrix)
+  illumination_file: "/home/hoangku/data/experimental_data/517nm/279x150x150_angle_illumination.mat"
+  illumination_mat_key: angle_illumination
+  output_root: "/home/hoangku/data/.../rmm2odt_run"   # all stage outputs go here
+
+runtime:
+  device: cuda               # cuda | cpu
+
+# --- Stage 1: multilayer (base reconstruction + depth scan) ---
+multilayer:
+  init_dir: ""               # leave empty to run base recon first; set to a prior
+                             # full-optimisation dir to SKIP base and scan from it.
+  layer_positions: [40, 20, 0]      # um; deepest..0 (sample plane last)
+  # NOTE: scanning_layer_order is AUTO-derived (no longer set by hand) -- it's the
+  # unique layer whose position falls inside scan_range below; all others freeze.
+  scanning_size: 150
+  illumination_mode: speckle
+  speckle: { s1_epochs: 20, steps_per_epoch: 100, proj_batch: 50, grad_clip_max_norm: 1.0, gpu_data: true }
+  pupil_funcs_type: [variable, variable]
+  optimization_hyperparams: { batch_size: 50, learning_rate: 0.02, gamma_coeff_1: 1.0, gamma_coeff_2: 0.0 }
+  reg_mode: [L2_norm]
+  base_epochs: 20            # epochs for the base reconstruction
+  scan_range: [5, 28]        # ABSOLUTE z window (um). Exactly ONE layer_position must lie inside;
+                             # that layer is swept across the window, the rest frozen. (Was dz; now absolute.)
+  scan_step: 1
+  scan_epochs: 10            # epochs per depth point
+  # ROD: null                # auto-detect from rrmat if omitted
+
+# --- Stage 2: GVAS (synthetic angular scan -> odt_input.mat) ---
+gvas:
+  grid: { Nx: 300, Ny: 300, Nz: 25, crop_size: 150 }
+  extend_illumination: true
+  use_scan_depths: true      # use stage-1 depths.npy for the depth axis
+  depths_center: 0.0         # physical distance = (depth - center) * scan_step
+  optimisation: { n_epochs: 25, batch_size: 3, learning_rate: 0.05, loss_fn: MSE, reg_mode: L2, reg_weight: 0.01 }
+
+# --- Stage 3: BPM_ODT (FISTA + 3D-TV + BPM -> ss_opt) ---
+odt:
+  geom: { Nx: 150, Ny: 150, Nz: 150 }
+  # npix / dz default to optics.resolution if omitted
+  optim: { n_iter: 50, gamma: 1.0e-4, damping: 1.0, ang_num: 40, stochastic: true }
+  reg:   { tau: 0.02, n_iter_tv: 5, n_upper: 1.7, n_lower: -0.01 }
+  preprocess: { intensity_normalize: false, window: none }
+  data_variant: illumination_output
+  checkpoint_at: [10, 20, 30, 40, 50]
+
+# --- Stage 4: render (ortho slices + z-scan video) ---
+render:
+  cmap: inferno
+  scalebar_um: 10
+  zscan_video: true
+  # Manuscript panels rendered from the pipeline's own artifacts
+  # (fig2c/2e/2e/3b/3d + fig4f_multi_depth_xy_odt_images). Enabled by default.
+  panels:
+    enable: true
+    formats: [png, svg]
+    fig4_z_um: [15, 20, 25]   # XY depths (µm) for fig4f_multi_depth_xy_odt_images
+    fig4_cmap: gray           # grayscale
+    # object_size_1b: 120     # confocal crop for fig1b
+    # crop_2d: null           # sample-plane crop for fig2d (null = adaptive)
+    # angle_indices: null     # fig3d angles (null = 5 evenly spaced)
+    # fig3d_rrmat: true       # add fig3d rows: angular image from the reflection matrix
+    # fig3d_rrmat_propagate_d: 14   # propagate the rrmat by this many µm first
+    # fig3d_rrmat_NA: null    # optional aperture NA for the propagation cone

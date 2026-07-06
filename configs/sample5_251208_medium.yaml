@@ -1,0 +1,73 @@
+# Sample 5 (251208) rmm2odt run -- params LEARNED from the prior pipeline's
+# run.log (optimized/scan_N9_layer4at35_scanlayers5_6_7_dz-4to4_5ep_Euler).
+# Static geometry matched exactly; depth sweep adapted to rmm2odt's single-sweep
+# model: sweep the sample plane (layer 8) across z=5..27 (23 depths) -- the same
+# effective coverage the prior GVAS consumed -- all-positive (avoids the
+# scan-dir _z regex that drops negative z). Quality = MEDIUM.
+name: sample5_251208_medium
+
+optics:
+  wavelength: 0.515          # from multilayer run.log (GVAS used 0.517; 0.515 makes npix==resolution)
+  NA: 1.0
+  NA_model: 1.0
+  n0: 1.56
+  resolution: 0.2581
+  scan_step: 1.0
+
+paths:
+  rrmat: "/home/hoangku/data/experimental_data/517nm/251208/5/mat_40um_z14.3644_21.2779/rrmat.mat"
+  illumination_file: "/home/hoangku/data/experimental_data/517nm/279x150x150_angle_illumination.mat"
+  illumination_mat_key: angle_illumination
+  output_root: "/home/hoangku/data/experimental_data/517nm/251208/5/mat_40um_z14.3644_21.2779/rmm2odt_run_medium"
+
+runtime:
+  device: cuda
+
+multilayer:
+  init_dir: ""               # "" = run base recon first; set to a prior base dir to skip it
+  layer_positions: [100, 70, 50, 40, 35, 23, 14, 5, 0]   # FULL model; base recon uses all 9 layers
+  # Depth scan AUTO-collapses the in-window layers (23,14,5) into ONE object layer
+  # at the window centre; all outside layers frozen (carried from the base recon).
+  scan_collapse_mode: center
+  scanning_size: 156
+  ROD: 150
+  complex_tensor_type: Euler
+  geometry_mode: Reflection
+  illumination_mode: speckle
+  speckle: { s1_epochs: 10, steps_per_epoch: 100, proj_batch: 50, grad_clip_max_norm: 1.0, gpu_data: true }
+  pupil_funcs_type: [variable, variable]    # base recon learns pupils; scan freezes them (auto)
+  optimization_hyperparams: { batch_size: 50, learning_rate: 0.02, gamma_coeff_1: 1.0, gamma_coeff_2: 1.0 }
+  reg_mode: [L2_norm]
+  base_epochs: 10                    # MEDIUM
+  scan_range: [5, 28]                # ABSOLUTE z window (um). The one layer inside -> object, swept z=5..27 (23 depths). Others frozen.
+  scan_step: 1
+  scan_epochs: 5                     # MEDIUM
+
+gvas:
+  grid: { Nx: 300, Ny: 300, Nz: 23, crop_size: 200 }
+  extend_illumination: true
+  use_scan_depths: false             # match prior GVAS: explicit distance_range
+  distance_range: [-9, 14]           # 23 frames <-> the 23 scan depths (z=5..27)
+  distance_step: 1
+  optimisation: { n_epochs: 15, batch_size: 3, learning_rate: 0.05, loss_fn: MSE, reg_mode: L2, reg_weight: 0.01, save_crop_size: 150 }
+
+odt:
+  geom: { Nx: 150, Ny: 150, Nz: 150 }
+  optim: { n_iter: 30, gamma: 1.0e-4, damping: 1.0, ang_num: 40, stochastic: true }
+  reg:   { tau: 0.02, n_iter_tv: 5, n_upper: 1.7, n_lower: -0.01 }
+  preprocess: { intensity_normalize: false, window: none }
+  data_variant: illumination_output
+  checkpoint_at: [10, 20, 30]
+
+render:
+  cmap: inferno
+  scalebar_um: 10
+  zscan_video: true
+  panels:
+    enable: true
+    formats: [png, svg]
+    fig4_z_um: [15, 20, 25]        # grayscale XY depths for fig4f_multi_depth_xy_odt_images
+    fig4_cmap: gray
+    crop_2d: 156                   # matches the manuscript sample5 fig2d crop
+    fig3d_rrmat: true              # add angular-image rows from the reflection matrix
+    fig3d_rrmat_propagate_d: 14    # propagate the rrmat by 14 µm before extraction
