@@ -98,7 +98,7 @@ python -c "import torch; print('CUDA:', torch.cuda.is_available(), torch.cuda.ge
 
 The input data is hosted on Figshare (it is **not** in the git repo):
 
-> **Figshare:** https://doi.org/10.6084/m9.figshare.\<ARTICLE_ID\>   ← replace with the dataset DOI
+> **Figshare:** https://doi.org/10.6084/m9.figshare.32904746
 
 Download and unpack it into a folder of your choice. That folder must contain
 the two files (names matter — the config looks them up by name):
@@ -349,7 +349,8 @@ warned-and-skipped, not fatal.
 ## Data & code availability
 
 - **Code**: this repository (GitHub).
-- **Data**: Figshare, DOI above. `rrmat.mat` + `279x150x150_angle_illumination.mat`.
+- **Data**: Figshare — https://doi.org/10.6084/m9.figshare.32904746
+  (`rrmat.mat` + `279x150x150_angle_illumination.mat`).
 
 If you use this pipeline, please cite the associated paper and the Figshare
 dataset. *(Add the citation / BibTeX here before publishing.)*
