@@ -56,9 +56,10 @@ on all platforms.
 - **Disk**: ~10 GB free (≈ 4.8 GB data + a few GB of run artifacts).
 - **Software**: [Miniconda/Anaconda](https://docs.conda.io/en/latest/miniconda.html)
   and `git`.
-  - **Windows**: run every command below in the **Anaconda Prompt** or in
-    **PowerShell** after `conda init powershell` (so `conda activate` works).
-    Use forward slashes `/` in paths — Python accepts them on Windows.
+  - **Windows**: run every command below in the **Anaconda Prompt**, or in
+    **PowerShell** after running `conda init powershell` **once and reopening
+    the terminal** (so `conda activate` works). Use forward slashes `/` in
+    paths — Python accepts them on Windows.
 
 ### 2. Get the code
 
@@ -75,15 +76,19 @@ Identical on Linux and Windows (run in a terminal / Anaconda Prompt):
 conda create -n rmm2odt python=3.10 -y
 conda activate rmm2odt
 
-# Install a CUDA build of PyTorch that matches your driver (see pytorch.org).
-# Example (CUDA 11.8) — same command on Linux and Windows:
+# Install a CUDA build of PyTorch FIRST, matching your GPU's CUDA version.
+# Check yours with `nvidia-smi` (top-right "CUDA Version:") and pick the
+# matching wheel from https://pytorch.org/get-started/locally/.
+# Example for CUDA 11.8 (same command on Linux and Windows):
 pip install torch --index-url https://download.pytorch.org/whl/cu118
 
-# Everything else:
+# Then everything else. (Installing torch first matters: a bare
+# `pip install torch` — which requirements.txt would otherwise pull — is
+# CPU-only on Windows and would leave you without GPU support.)
 pip install -r requirements.txt
 ```
 
-Verify the GPU is visible:
+Verify the GPU is visible (should print `CUDA: True <your GPU>`):
 
 ```bash
 python -c "import torch; print('CUDA:', torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else '')"
@@ -313,6 +318,10 @@ warned-and-skipped, not fatal.
   isn't set or the two files aren't in it with the exact expected names.
 - **`torch.cuda.is_available()` is False** — you installed a CPU-only PyTorch.
   Reinstall a CUDA build matching your driver (see step 3).
+- **GPU out-of-memory during stages 1–3** — your card has less VRAM than the
+  reference run. Try `configs/sample5_251208.yaml` (the lighter "shakedown"
+  variant), or lower the sizes in the config (`multilayer.scanning_size`,
+  `gvas.grid`, `odt.geom`).
 - **Out-of-memory during render (`fig2c`/`fig3d`)** — these load the full
   ~4.7 GB rrmat; the `fig3d` propagated-rrmat step needs several GB more. Free
   RAM, or set `render.panels.fig3d_rrmat: false` to skip the heavy rows.
