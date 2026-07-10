@@ -414,6 +414,7 @@ def build_panels_kwargs(P, d):
         medium_n=o["n0"],
         object_size_1b=int(pan.get("object_size_1b", 120)),
         crop_2d=pan.get("crop_2d"),
+        fig3b_crop_size=pan.get("fig3b_crop_size"),
         angle_indices=([int(x) for x in ai] if ai is not None else None),
         layer_positions=P.get("multilayer", {}).get("layer_positions"),
         fig3d_rrmat=fig3d_rrmat,

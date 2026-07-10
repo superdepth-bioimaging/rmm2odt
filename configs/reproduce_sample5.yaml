@@ -82,6 +82,7 @@ render:
     fig4_vmax: 0.04
     fig4_outline_color: black      # per-depth frame colour (was red/green/blue)
     crop_2d: 156                   # sample-plane crop for fig2e_optimized_object
+    fig3b_crop_size: 160           # centre-crop each fig3b depth-scan image to 160x160
     # fig3d: 2 rows (illum phase + output phase), epoch-5 GVAS output, small angles.
     angle_indices: [0, 5, 15, 30, 45]  # 5 small illumination angles; col 1 = on-axis
     fig3d_show_output_amp: false       # drop the output |E| row

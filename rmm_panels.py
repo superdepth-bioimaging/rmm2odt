@@ -757,7 +757,8 @@ def render_manuscript_panels(*, out_dir, rrmat=None, layer_dir=None, layer_epoch
                              ss_opt_key="ss_opt",
                              resolution_um=0.2581, scalebar_um=10.0, dz_um=None,
                              wavelength_um=0.517, medium_n=1.33,
-                             object_size_1b=120, crop_2d=None, angle_indices=None,
+                             object_size_1b=120, crop_2d=None, fig3b_crop_size=None,
+                             angle_indices=None,
                              layer_positions=None,
                              fig3d_rrmat=None, fig3d_rrmat_propagate_d=None,
                              fig3d_rrmat_NA=None, fig3d_show_output_amp=True,
@@ -797,7 +798,8 @@ def render_manuscript_panels(*, out_dir, rrmat=None, layer_dir=None, layer_epoch
         _run("fig2e_optimized_object", panel_2d, layer_dir=layer_dir,
              epoch=layer_epoch, crop_size=crop_2d, **common)
     if scan_stack is not None:
-        _run("fig3b_depth_scanned_layers", panel_3b, scan_stack=scan_stack, **common)
+        _run("fig3b_depth_scanned_layers", panel_3b, scan_stack=scan_stack,
+             crop_size=fig3b_crop_size, **common)
     if odt_input is not None:
         _run("fig3d_angular_transmission_fields", panel_3d, odt_input_mat=odt_input,
              angle_indices=angle_indices, wavelength_um=wavelength_um,
