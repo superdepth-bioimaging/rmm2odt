@@ -247,6 +247,16 @@ def run_optimization(cfg: Config) -> Dict[str, Any]:
     output_stack = final_cropped * UI_cropped
     utils.save_odt_input(UI_cropped, output_stack, out_dir, filename="odt_input.mat")
 
+    # Also emit an odt_input .mat per saved epoch snapshot, so a figure that
+    # wants a specific epoch (fig3d uses epoch-5) has its input available.
+    # Snapshots are already cropped to save_crop, matching UI_cropped.
+    for snap in sorted(out_dir.glob("U_stack_epoch*.npy")):
+        ep = snap.stem.split("epoch")[-1]
+        Ue = np.load(snap)
+        utils.save_odt_input(UI_cropped, Ue * UI_cropped, out_dir,
+                             filename=f"odt_input_epoch{ep}.mat")
+        log.info("wrote odt_input_epoch%s.mat", ep)
+
     elapsed = time.time() - t0
     log.info("done in %.1fs → %s", elapsed, out_dir)
 

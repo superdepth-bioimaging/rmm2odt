@@ -33,7 +33,7 @@ multilayer:
   init_dir: "${RMM2ODT_INIT_DIR:-}"   # empty = run base recon first; set to a
                                       # completed base dir to SKIP base and only
                                       # depth-scan from it (see run_from_scan.sh)
-  layer_positions: [100, 70, 50, 40, 30, 14, 0]   # full 9-layer model (µm)
+  layer_positions: [100, 70, 50, 35, 14, 0]   # layer depths (µm)
   scan_collapse_mode: center # >=2 in-window layers -> collapse to one swept object layer
   scanning_size: 156
   ROD: 150
