@@ -81,6 +81,7 @@ def _load_and_process_data(
     # rrmat mode
     rrmat_path: str = '',
     rrmat_sigma: float = 0,
+    rrmat_spot_offset: tuple[int, int] = (0, 0),
     wavelength: float = 0,
     medium_refractive_index: float = 1.0,
     resolution: float = 0,
@@ -141,7 +142,8 @@ def _load_and_process_data(
         rr, Nx_det, Nx_illum, wl, n0, dx = load_rrmat(
             rrmat_path, wl=wavelength, n0=medium_refractive_index, dx=resolution,
         )
-        illum, labels = rrmat_to_illum_labels(rr, Nx_det, Nx_illum, sigma=rrmat_sigma)
+        illum, labels = rrmat_to_illum_labels(
+            rr, Nx_det, Nx_illum, sigma=rrmat_sigma, spot_offset=rrmat_spot_offset)
         # Chunked abs-max + in-place divide: avoids a 7 GB abs() temp AND a
         # 14 GB divide-result temp on large rrmats (tight cgroup memory).
         _chunk = 2000
@@ -352,6 +354,7 @@ class MultiLayerOptimizationTorch:
 
     def load_from_rrmat(
         self, rrmat_path: str | Path, sigma: float = 0,
+        spot_offset: tuple[int, int] = (0, 0),
     ) -> tuple[int, int]:
         """Load data from a single R-matrix .mat file.
 
@@ -386,7 +389,8 @@ class MultiLayerOptimizationTorch:
         self.refractive_index = n0
         self.resolution = dx
 
-        illum, labels = rrmat_to_illum_labels(rr, Nx_det, Nx_illum, sigma=sigma)
+        illum, labels = rrmat_to_illum_labels(
+            rr, Nx_det, Nx_illum, sigma=sigma, spot_offset=spot_offset)
         self.illumination_data = illum
         # Chunked abs-max + in-place divide: avoids a 7 GB abs() temp AND a
         # 14 GB divide-result temp on large rrmats (tight cgroup memory).
@@ -759,18 +763,28 @@ class MultiLayerOptimizationTorch:
 
             # Rescale + resize to current layer sizes (process input and output
             # separately since reflection geometry has N output but N-1 input).
+            # Encode into the model's OWN parameter representation (the inverse of
+            # MultiLayerModelTorch._to_complex): [amp, phase] for Euler /
+            # phase-only complex, [re, im] for Rectangular. The old unconditional
+            # [re, im] (_layer_to_array) mis-loaded Euler warm-starts — the model
+            # reads channel0 as amplitude, channel1 as phase, so a loaded field
+            # A·e^{iφ} became A·cosφ·e^{i·A·sinφ} (bead phase sign-flips).
+            def _enc(z):
+                if self.complex_tensor_type == 'Rectangular':
+                    return np.array([np.real(z), np.imag(z)], dtype=np.float32)
+                return np.array([np.abs(z), np.angle(z)], dtype=np.float32)
             for i, inp in enumerate(in_layers_loaded):
                 if res != self.resolution:
                     inp = match_ROIandres(inp[np.newaxis], res, self.resolution, inp.shape[-1])[0]
                 sz = int(layer_sizes[i])
                 inp = change_size_np(inp[np.newaxis], sz)[0]
-                input_funcs.append(self._layer_to_array(inp))
+                input_funcs.append(_enc(inp))
             for i, out in enumerate(out_layers_loaded):
                 if res != self.resolution:
                     out = match_ROIandres(out[np.newaxis], res, self.resolution, out.shape[-1])[0]
                 sz = int(layer_sizes[i])
                 out = change_size_np(out[np.newaxis], sz)[0]
-                output_funcs.append(self._layer_to_array(out))
+                output_funcs.append(_enc(out))
 
         else:
             raise ValueError("mode must be 'initial' or 'previous'")
@@ -1815,6 +1829,7 @@ def run_from_config(cfg: dict) -> None:
         use_compile=use_compile,
         rrmat_path=cfg.get('rrmat_path') or '',
         rrmat_sigma=cfg.get('rrmat_sigma', 0),
+        rrmat_spot_offset=tuple(cfg.get('rrmat_spot_offset', (0, 0))),
         raw_mat_path=cfg.get('raw_mat_path') or '',
         raw_N_d=cfg.get('raw_N_d', 260),
         raw_xc=cfg.get('raw_xc', 129),
@@ -1873,6 +1888,7 @@ def run_from_config(cfg: dict) -> None:
             data_format=data_format,
             rrmat_path=common.get('rrmat_path', ''),
             rrmat_sigma=common.get('rrmat_sigma', 0),
+            rrmat_spot_offset=common.get('rrmat_spot_offset', (0, 0)),
             wavelength=cfg['wavelength'],
             medium_refractive_index=cfg['medium_refractive_index'],
             resolution=cfg['resolution'],
@@ -2032,6 +2048,7 @@ def _run_single(
     use_compile: bool = False,
     rrmat_path: str = '',
     rrmat_sigma: float = 0,
+    rrmat_spot_offset: tuple[int, int] = (0, 0),
     raw_mat_path: str = '',
     raw_N_d: int = 260,
     raw_xc: int = 129,
@@ -2114,7 +2131,8 @@ def _run_single(
                 sat_kernel_size=sat_kernel_size,
                 sat_n_passes=sat_n_passes,
             )
-            Nx_det, Nx_illum = opt.load_from_rrmat(rrmat_path, sigma=rrmat_sigma)
+            Nx_det, Nx_illum = opt.load_from_rrmat(
+                rrmat_path, sigma=rrmat_sigma, spot_offset=rrmat_spot_offset)
 
             if illumination_size not in (0, Nx_illum) and illumination_size > 0:
                 logger.warning(

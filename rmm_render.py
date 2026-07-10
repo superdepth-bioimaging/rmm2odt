@@ -52,7 +52,8 @@ def _display_transform(vol: np.ndarray) -> np.ndarray:
 def render_odt(volume, out_dir: str, *, resolution_um: float = 0.2581,
                dz_um: float | None = None, scalebar_um: float = 10.0,
                cmap: str = "inferno", ss_opt_key: str = "ss_opt",
-               zscan_video: bool = True, vmin=None, vmax=None) -> dict:
+               zscan_video: bool = True, make_ortho: bool = True,
+               vmin=None, vmax=None) -> dict:
     """Render ortho slices (+ optional z-scan video) from a ss_opt volume.
 
     `volume` may be a path to a ss_opt .mat or an (Ny, Nx, Nz) ndarray.
@@ -79,28 +80,29 @@ def render_odt(volume, out_dir: str, *, resolution_um: float = 0.2581,
     out = {}
 
     # ---- ortho figure: XY (z mid) | XZ (y mid) | YZ (x mid) ----
-    xy = vol[Nz // 2, :, :]
-    xz = vol[:, Ny // 2, :]                      # (Nz, Nx)
-    yz = vol[:, :, Nx // 2]                      # (Nz, Ny)
-    aspect_axial = dz / resolution_um
-    fig, axs = plt.subplots(1, 3, figsize=(11, 3.6))
-    im = axs[0].imshow(xy, cmap=cmap, vmin=vmin, vmax=vmax)
-    axs[0].set_title("XY (central z)")
-    add_scalebar(axs[0], resolution_um, scalebar_um)
-    axs[1].imshow(xz, cmap=cmap, vmin=vmin, vmax=vmax, aspect=aspect_axial)
-    axs[1].set_title("XZ (central y)")
-    axs[2].imshow(yz, cmap=cmap, vmin=vmin, vmax=vmax, aspect=aspect_axial)
-    axs[2].set_title("YZ (central x)")
-    for ax in axs:
-        ax.set_xticks([]); ax.set_yticks([])
-    add_colorbar(fig, axs[2], im)
-    fig.suptitle("ODT reconstruction (n - n0)", fontsize=10)
-    fig.tight_layout()
-    for ext in ("png", "svg"):
-        fp = os.path.join(out_dir, f"fig_ortho.{ext}")
-        fig.savefig(fp, dpi=200, bbox_inches="tight")
-        out[ext] = fp
-    plt.close(fig)
+    if make_ortho:
+        xy = vol[Nz // 2, :, :]
+        xz = vol[:, Ny // 2, :]                      # (Nz, Nx)
+        yz = vol[:, :, Nx // 2]                      # (Nz, Ny)
+        aspect_axial = dz / resolution_um
+        fig, axs = plt.subplots(1, 3, figsize=(11, 3.6))
+        im = axs[0].imshow(xy, cmap=cmap, vmin=vmin, vmax=vmax)
+        axs[0].set_title("XY (central z)")
+        add_scalebar(axs[0], resolution_um, scalebar_um)
+        axs[1].imshow(xz, cmap=cmap, vmin=vmin, vmax=vmax, aspect=aspect_axial)
+        axs[1].set_title("XZ (central y)")
+        axs[2].imshow(yz, cmap=cmap, vmin=vmin, vmax=vmax, aspect=aspect_axial)
+        axs[2].set_title("YZ (central x)")
+        for ax in axs:
+            ax.set_xticks([]); ax.set_yticks([])
+        add_colorbar(fig, axs[2], im)
+        fig.suptitle("ODT reconstruction (n - n0)", fontsize=10)
+        fig.tight_layout()
+        for ext in ("png", "svg"):
+            fp = os.path.join(out_dir, f"fig_ortho.{ext}")
+            fig.savefig(fp, dpi=200, bbox_inches="tight")
+            out[ext] = fp
+        plt.close(fig)
 
     # ---- z-scan video ----
     if zscan_video:

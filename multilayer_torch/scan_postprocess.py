@@ -250,10 +250,10 @@ def make_scan_postprocess(
             continue
         if crop_size is None:
             in0, out0 = result
-            crop_size = max(in0.shape[0], in0.shape[1],
-                            out0.shape[0], out0.shape[1]) // 2
+            crop_size = (in0.shape[0] + in0.shape[1]
+                         + out0.shape[0] + out0.shape[1]) // 4
             logger.info(
-                'Input raw=%dx%d, output raw=%dx%d, crop_size=%d (half of max)',
+                'Input raw=%dx%d, output raw=%dx%d, crop_size=%d (mean of the 4 dims)',
                 in0.shape[0], in0.shape[1], out0.shape[0], out0.shape[1], crop_size,
             )
         valid_entries.append((z, d))

@@ -90,6 +90,7 @@ def _multilayer_common(P, d):
         data_format="rrmat",
         rrmat_path=P["paths"]["rrmat"],
         rrmat_sigma=float(m.get("rrmat_sigma", 0)),
+        rrmat_spot_offset=tuple(int(v) for v in m.get("rrmat_spot_offset", (0, 0))),
         save_every=int(m.get("save_every", 5)),
     )
     spk = m.get("speckle")
@@ -346,6 +347,7 @@ def build_render_kwargs(P, d):
         scalebar_um=float(r.get("scalebar_um", 10.0)),
         cmap=r.get("cmap", "inferno"),
         zscan_video=bool(r.get("zscan_video", True)),
+        make_ortho=bool(r.get("fig_ortho", True)),
     )
 
 
@@ -390,13 +392,19 @@ def build_panels_kwargs(P, d):
         fig3d_rrmat = P["paths"]["rrmat"]
     elif fig3d_rrmat in (False, None):
         fig3d_rrmat = None
+    # fig3d input override (e.g. an epoch-specific odt_input built from a per-epoch
+    # U_stack). Absolute path, or a filename resolved under the gvas output dir.
+    odt_input = inputs["odt_input"]
+    fig3d_in = pan.get("fig3d_odt_input")
+    if fig3d_in:
+        odt_input = fig3d_in if os.path.isabs(fig3d_in) else os.path.join(d["gvas"], fig3d_in)
     return dict(
         out_dir=d["render"],
         rrmat=inputs["rrmat"],
         layer_dir=inputs["layer_dir"],
         layer_epoch=inputs["layer_epoch"],
         scan_stack=inputs["scan_stack"],
-        odt_input=inputs["odt_input"],
+        odt_input=odt_input,
         ss_opt=ss_opt,
         ss_opt_key=ss_opt_key,
         resolution_um=float(r.get("resolution_um", o["resolution"])),
@@ -411,8 +419,15 @@ def build_panels_kwargs(P, d):
         fig3d_rrmat=fig3d_rrmat,
         fig3d_rrmat_propagate_d=pan.get("fig3d_rrmat_propagate_d"),
         fig3d_rrmat_NA=pan.get("fig3d_rrmat_NA"),
+        fig3d_show_output_amp=bool(pan.get("fig3d_show_output_amp", True)),
+        fig3d_subtract_output_ramp=bool(pan.get("fig3d_subtract_output_ramp", False)),
         fig4_z_um=[float(z) for z in pan.get("fig4_z_um", [15.0, 20.0, 25.0])],
         fig4_cmap=pan.get("fig4_cmap", "gray"),
+        fig4_true_depth_focus_um=pan.get("fig4_true_depth_focus_um"),
+        fig4_true_depth_ref_idx=pan.get("fig4_true_depth_ref_idx"),
+        fig4_vmin=pan.get("fig4_vmin"),
+        fig4_vmax=pan.get("fig4_vmax"),
+        fig4_outline_color=pan.get("fig4_outline_color"),
         formats=list(pan.get("formats", ["png", "svg"])),
     )
 

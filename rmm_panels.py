@@ -521,7 +521,8 @@ def panel_3b(*, scan_stack: Path, depth_indices=None, depth_axis_um=None,
 
 def panel_3d(*, odt_input_mat: Path, angle_indices=None, resolution_um: float = 0.2581,
              scalebar_length: float = 10.0, crop_size=None, wavelength_um: float = 0.517,
-             medium_n: float = 1.33, demodulate_tilt: bool = True,
+             medium_n: float = 1.33, demodulate_tilt: bool = True, show_output_amp: bool = True,
+             subtract_output_ramp: bool = False,
              rrmat_path=None, rrmat_propagate_d=None, rrmat_NA=None,
              out_dir: Path, formats: Iterable[str]):
     """Fig 3d — odt_input.mat content, optionally with propagated-rrmat rows.
@@ -594,7 +595,18 @@ def panel_3d(*, odt_input_mat: Path, angle_indices=None, resolution_um: float = 
                                    for i in range(rxk_fields.shape[0])])
 
     n = len(angle_indices)
-    n_rows = 5 if rxk_fields is not None else 3
+    # Build the active row list (top -> bottom). Each: (key, label, cmap, vmin, vmax, phase_ticks).
+    out_tag = "GVAS" if rxk_fields is not None else "Output"
+    rows = [("illum_ph", "Illum. phase", CMAP_PHASE, -np.pi, np.pi, True)]
+    if show_output_amp:
+        rows.append(("out_amp", f"{out_tag} |E|", "hot", 0.0, 1.0, False))
+    rows.append(("out_ph", f"{out_tag} phase", CMAP_PHASE, -np.pi, np.pi, True))
+    if rxk_fields is not None:
+        d_lbl = f" (+{rrmat_propagate_d:g} µm)" if rrmat_propagate_d else ""
+        rows.append(("rxk_amp", f"Rxk |E|{d_lbl}", "hot", 0.0, 1.0, False))
+        rows.append(("rxk_ph", "Rxk phase", CMAP_PHASE, -np.pi, np.pi, True))
+    n_rows = len(rows)
+
     fig_w = 6.85
     LEFT, RIGHT, TOP, BOTTOM = 0.07, 0.99, 0.93, 0.03
     col_w_frac = (RIGHT - LEFT) / (n + 0.05)
@@ -604,73 +616,52 @@ def panel_3d(*, odt_input_mat: Path, angle_indices=None, resolution_um: float = 
                           width_ratios=[1.0] * n + [0.05],
                           left=LEFT, right=RIGHT, top=TOP, bottom=BOTTOM)
 
-    last_im_ip = last_im_a = last_im_p = None
-    last_im_a_xk = last_im_p_xk = None
+    last_im: dict = {}
     for col, ai in enumerate(angle_indices):
-        # illumination tilt (reused for GVAS + Rxk phase demod)
         if demodulate_tilt:
             _, kx_i, ky_i = _auto_demodulate_tilt(UI[ai])
         else:
             kx_i = ky_i = 0.0
-
-        ax_ip = fig.add_subplot(gs[0, col])
-        last_im_ip = ax_ip.imshow(np.angle(UI[ai]), cmap=CMAP_PHASE, vmin=-np.pi, vmax=np.pi)
-        ax_ip.set_box_aspect(1.0); _strip_ticks(ax_ip)
-        ax_ip.set_title(angle_labels[col], pad=3, fontsize=8)
-        if col == 0:
-            _add_scalebar(ax_ip, resolution_um, scalebar_length)
-
-        amp_g = np.abs(U[ai]); amp_g = amp_g / (amp_g.max() + 1e-12)
-        ax_a = fig.add_subplot(gs[1, col])
-        last_im_a = ax_a.imshow(amp_g, cmap="hot", vmin=0, vmax=1)
-        ax_a.set_box_aspect(1.0); _strip_ticks(ax_a)
-
-        pg = np.angle(_demodulate_tilt(U[ai], kx_i, ky_i)) if demodulate_tilt else np.angle(U[ai])
-        ax_p = fig.add_subplot(gs[2, col])
-        last_im_p = ax_p.imshow(pg, cmap=CMAP_PHASE, vmin=-np.pi, vmax=np.pi)
-        ax_p.set_box_aspect(1.0); _strip_ticks(ax_p)
-
+        imgs = {"illum_ph": np.angle(UI[ai])}
+        if show_output_amp:
+            a = np.abs(U[ai]); imgs["out_amp"] = a / (a.max() + 1e-12)
+        U_out = U[ai]
+        if demodulate_tilt:
+            U_out = _demodulate_tilt(U_out, kx_i, ky_i)     # cancel illumination tilt
+        if subtract_output_ramp:
+            U_out, _, _ = _auto_demodulate_tilt(U_out)      # subtract residual linear phase ramp
+        imgs["out_ph"] = np.angle(U_out)
         if rxk_fields is not None:
             xk = rxk_fields[col]
-            amp_x = np.abs(xk); amp_x = amp_x / (amp_x.max() + 1e-12)
-            ax_a2 = fig.add_subplot(gs[3, col])
-            last_im_a_xk = ax_a2.imshow(amp_x, cmap="hot", vmin=0, vmax=1)
-            ax_a2.set_box_aspect(1.0); _strip_ticks(ax_a2)
-            if col == 0:
-                _add_scalebar(ax_a2, resolution_um, scalebar_length)
+            ax_ = np.abs(xk); imgs["rxk_amp"] = ax_ / (ax_.max() + 1e-12)
             if demodulate_tilt:
-                xk_d1 = _demodulate_tilt(xk, kx_i, ky_i)      # cancel illum tilt
-                xk_d2, _, _ = _auto_demodulate_tilt(xk_d1)    # cancel residual tilt
-                px = np.angle(xk_d2)
+                xk2, _, _ = _auto_demodulate_tilt(_demodulate_tilt(xk, kx_i, ky_i))
+                imgs["rxk_ph"] = np.angle(xk2)
             else:
-                px = np.angle(xk)
-            ax_p2 = fig.add_subplot(gs[4, col])
-            last_im_p_xk = ax_p2.imshow(px, cmap=CMAP_PHASE, vmin=-np.pi, vmax=np.pi)
-            ax_p2.set_box_aspect(1.0); _strip_ticks(ax_p2)
+                imgs["rxk_ph"] = np.angle(xk)
+        for r, (key, lbl, cmap, vmn, vmx, pt) in enumerate(rows):
+            ax = fig.add_subplot(gs[r, col])
+            im = ax.imshow(imgs[key], cmap=cmap, vmin=vmn, vmax=vmx)
+            ax.set_box_aspect(1.0); _strip_ticks(ax)
+            if r == 0:
+                ax.set_title(angle_labels[col], pad=3, fontsize=8)
+            if col == 0 and key in ("illum_ph", "out_amp", "rxk_amp"):
+                _add_scalebar(ax, resolution_um, scalebar_length)
+            last_im[key] = im
 
     def _phase_cbar(cax, im):
         cb = fig.colorbar(im, cax=cax); cb.ax.tick_params(labelsize=7)
         cb.set_ticks([-np.pi, -np.pi / 2, 0, np.pi / 2, np.pi])
         cb.set_ticklabels([r"$-\pi$", r"$-\pi/2$", "0", r"$\pi/2$", r"$\pi$"])
         return cb
-    if last_im_ip is not None:
-        _phase_cbar(fig.add_subplot(gs[0, n]), last_im_ip)
-        cb_a = fig.colorbar(last_im_a, cax=fig.add_subplot(gs[1, n]))
-        cb_a.ax.tick_params(labelsize=7)
-        _phase_cbar(fig.add_subplot(gs[2, n]), last_im_p)
-        if rxk_fields is not None:
-            cb_a2 = fig.colorbar(last_im_a_xk, cax=fig.add_subplot(gs[3, n]))
-            cb_a2.ax.tick_params(labelsize=7)
-            _phase_cbar(fig.add_subplot(gs[4, n]), last_im_p_xk)
-
-    if rxk_fields is not None:
-        d_lbl = f" (+{rrmat_propagate_d:g} µm)" if rrmat_propagate_d else ""
-        row_labels = ["Illum. phase", "GVAS |E|", "GVAS phase",
-                      f"Rxk |E|{d_lbl}", "Rxk phase"]
-    else:
-        row_labels = ["Illum. phase", "Output |E|", "Output phase"]
+    for r, (key, lbl, cmap, vmn, vmx, pt) in enumerate(rows):
+        cax = fig.add_subplot(gs[r, n])
+        if pt:
+            _phase_cbar(cax, last_im[key])
+        else:
+            cb = fig.colorbar(last_im[key], cax=cax); cb.ax.tick_params(labelsize=7)
     row_h = (TOP - BOTTOM) / n_rows
-    for r, lbl in enumerate(row_labels):
+    for r, (key, lbl, *_rest) in enumerate(rows):
         y = TOP - row_h * (r + 0.5)
         fig.text(0.02, y, lbl, fontsize=8, rotation=90, va="center", ha="center",
                  fontweight="bold")
@@ -681,12 +672,23 @@ def panel_4_multi_depth_xy(*, ss_opt_mat: Path, ss_opt_key: str = "ss_opt",
                            z_um=(15.0, 20.0, 25.0), resolution_um: float = 0.2581,
                            dz_um=None, scalebar_length: float = 10.0, cmap: str = "gray",
                            vmin=None, vmax=None, outline_colors=None, outline_lw: float = 2.5,
-                           flip_z: bool = False, out_dir: Path, formats: Iterable[str]):
+                           flip_z: bool = False, true_depth_focus_um=None,
+                           true_depth_ref_idx=None, out_dir: Path, formats: Iterable[str]):
     """Fig 4 (multi-depth XY) — K XY cross-sections of the ODT volume.
 
     Grayscale by default with z = 15/20/25 μm. Each column carries a
-    per-depth coloured frame + z title. z_um is mapped to depth index via
-    round(z / dz)."""
+    per-depth coloured frame + z title.
+
+    Two z-axis conventions:
+      - default (``true_depth_focus_um`` None): labels are VOLUME coordinates,
+        z = index·dz measured from the BPM slab's front face. Index of a
+        requested z = round(z / dz).
+      - true-depth anchor (``true_depth_focus_um`` set): labels are TRUE sample
+        depth. The BPM centres the zero-defocus plane at slice
+        ``true_depth_ref_idx`` (default Nz//2+1, the DFR_Ori convention), which
+        physically sits at ``true_depth_focus_um`` (the swept object-layer
+        position). Then true_z(index) = focus + (index − ref)·dz, and a
+        requested true z maps to index = round(ref + (z − focus)/dz)."""
     import matplotlib.pyplot as plt
     try:
         vol = _load_ss_opt_volume(ss_opt_mat, ss_opt_key)
@@ -697,10 +699,22 @@ def panel_4_multi_depth_xy(*, ss_opt_mat: Path, ss_opt_key: str = "ss_opt",
         vol = np.flip(vol, axis=0).copy()   # z increases with index (solver frame)
     Nz, Ny, Nx = vol.shape
     dz = dz_um if dz_um is not None else resolution_um
-    z_indices = [max(0, min(Nz - 1, int(round(z / dz)))) for z in z_um]
+    if true_depth_focus_um is not None:
+        ref = int(true_depth_ref_idx) if true_depth_ref_idx is not None else (Nz // 2 + 1)
+        z_indices = [max(0, min(Nz - 1, int(round(ref + (z - true_depth_focus_um) / dz))))
+                     for z in z_um]
+        def _z_label(zi):
+            return f"z = {true_depth_focus_um + (zi - ref) * dz:.1f} μm"
+        LOG.info("panel_4_multi_depth_xy: TRUE-depth anchor focus=%.2fμm@idx%d dz=%.4f "
+                 "z_um=%s -> idx=%s cmap=%s", true_depth_focus_um, ref, dz,
+                 list(z_um), z_indices, cmap)
+    else:
+        z_indices = [max(0, min(Nz - 1, int(round(z / dz)))) for z in z_um]
+        def _z_label(zi):
+            return f"z = {zi * dz:.1f} μm"
+        LOG.info("panel_4_multi_depth_xy: volume-coord vol %s dz=%.4f z_um=%s -> idx=%s cmap=%s",
+                 tuple(vol.shape), dz, list(z_um), z_indices, cmap)
     K = len(z_indices)
-    LOG.info("panel_4_multi_depth_xy: vol %s dz=%.4f z_um=%s -> idx=%s cmap=%s",
-             tuple(vol.shape), dz, list(z_um), z_indices, cmap)
 
     rvmin = vol.min() if vmin is None else vmin
     rvmax = float(vol.max() * 0.95) if vmax is None else vmax
@@ -722,7 +736,7 @@ def panel_4_multi_depth_xy(*, ss_opt_mat: Path, ss_opt_key: str = "ss_opt",
         ax.set_box_aspect(1.0); ax.set_xticks([]); ax.set_yticks([])
         for sp in ax.spines.values():
             sp.set_visible(True); sp.set_edgecolor(outline_colors[c]); sp.set_linewidth(outline_lw)
-        ax.set_title(f"z = {zi * dz:.1f} μm", pad=4,
+        ax.set_title(_z_label(zi), pad=4,
                      color=outline_colors[c], fontweight="bold")
         if c == 0:
             _add_scalebar(ax, resolution_um, scalebar_length)
@@ -746,8 +760,11 @@ def render_manuscript_panels(*, out_dir, rrmat=None, layer_dir=None, layer_epoch
                              object_size_1b=120, crop_2d=None, angle_indices=None,
                              layer_positions=None,
                              fig3d_rrmat=None, fig3d_rrmat_propagate_d=None,
-                             fig3d_rrmat_NA=None,
+                             fig3d_rrmat_NA=None, fig3d_show_output_amp=True,
+                             fig3d_subtract_output_ramp=False,
                              fig4_z_um=(15.0, 20.0, 25.0), fig4_cmap="gray",
+                             fig4_true_depth_focus_um=None, fig4_true_depth_ref_idx=None,
+                             fig4_vmin=None, fig4_vmax=None, fig4_outline_color=None,
                              formats=("png", "svg")) -> dict:
     """Render the six manuscript panels from pipeline artifacts.
 
@@ -784,11 +801,18 @@ def render_manuscript_panels(*, out_dir, rrmat=None, layer_dir=None, layer_epoch
     if odt_input is not None:
         _run("fig3d_angular_transmission_fields", panel_3d, odt_input_mat=odt_input,
              angle_indices=angle_indices, wavelength_um=wavelength_um,
-             medium_n=medium_n, rrmat_path=fig3d_rrmat,
+             medium_n=medium_n, show_output_amp=fig3d_show_output_amp,
+             subtract_output_ramp=fig3d_subtract_output_ramp,
+             rrmat_path=fig3d_rrmat,
              rrmat_propagate_d=fig3d_rrmat_propagate_d, rrmat_NA=fig3d_rrmat_NA,
              **common)
     if ss_opt is not None:
         _run("fig4f_multi_depth_xy_odt_images", panel_4_multi_depth_xy,
              ss_opt_mat=ss_opt, ss_opt_key=ss_opt_key, z_um=fig4_z_um,
-             cmap=fig4_cmap, dz_um=dz_um, **common)
+             cmap=fig4_cmap, dz_um=dz_um,
+             true_depth_focus_um=fig4_true_depth_focus_um,
+             true_depth_ref_idx=fig4_true_depth_ref_idx,
+             vmin=fig4_vmin, vmax=fig4_vmax,
+             outline_colors=([fig4_outline_color] if fig4_outline_color else None),
+             **common)
     return written

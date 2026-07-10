@@ -158,6 +158,7 @@ def rrmat_to_illum_labels(
     Nx_det: int,
     Nx_illum: int | None = None,
     sigma: float = 0,
+    spot_offset: tuple[int, int] = (0, 0),
 ) -> tuple[np.ndarray, np.ndarray]:
     """Convert reflection matrix to illumination and labels arrays.
 
@@ -171,6 +172,13 @@ def rrmat_to_illum_labels(
     Uses MATLAB column-major indexing: index i maps to
     (row=i%Nx_illum, col=i//Nx_illum).
 
+    ``spot_offset=(dy, dx)`` shifts every ideal focus spot by (dy, dx) on the
+    illumination grid (modulo Nx_illum, i.e. a circular shift, so the pattern
+    stays a valid bijective one-spot-per-source set). The reflection matrix
+    ``rr`` and the ``labels`` derived from it are NOT touched — only the
+    illumination positions move, deliberately mis-registering illumination vs
+    detection. Default (0, 0) reproduces the original behaviour.
+
     Parameters
     ----------
     rr : ndarray [Nx_det*Nx_det, Nx_illum*Nx_illum] complex64
@@ -181,6 +189,9 @@ def rrmat_to_illum_labels(
         Illumination grid dimension. If None, assumed equal to Nx_det.
     sigma : float
         Gaussian spot width. 0 or <=0.1 means delta function.
+    spot_offset : tuple[int, int]
+        (dy, dx) circular shift applied to every focus spot on the
+        illumination grid. Leaves rr / labels unchanged. Default (0, 0).
 
     Returns
     -------
@@ -203,6 +214,7 @@ def rrmat_to_illum_labels(
     labels = np.zeros((N_src, Nx_det, Nx_det), dtype=np.complex64)
 
     use_gaussian = sigma > 0.1
+    dy, dx = int(spot_offset[0]), int(spot_offset[1])
 
     if use_gaussian:
         yy, xx = np.mgrid[0:Nx_illum, 0:Nx_illum]
@@ -211,12 +223,16 @@ def rrmat_to_illum_labels(
         # MATLAB column-major indexing on the illumination grid
         row = i % Nx_illum
         col = i // Nx_illum
+        # Shift the ideal focus spot by (dy, dx), wrapping on the grid.
+        # Only the illumination moves; the label column below is unchanged.
+        srow = (row + dy) % Nx_illum
+        scol = (col + dx) % Nx_illum
 
         if use_gaussian:
-            spot = np.exp(-((yy - row) ** 2 + (xx - col) ** 2) / (2 * sigma ** 2))
+            spot = np.exp(-((yy - srow) ** 2 + (xx - scol) ** 2) / (2 * sigma ** 2))
             illum[i] = (spot / spot.sum() * Nx_illum).astype(np.complex64)
         else:
-            illum[i, row, col] = Nx_illum  # delta function
+            illum[i, srow, scol] = Nx_illum  # delta function
 
         # Label = R-matrix column i reshaped to detection grid (MATLAB F-order)
         labels[i] = rr[:, i].reshape(Nx_det, Nx_det, order='F')
@@ -224,13 +240,15 @@ def rrmat_to_illum_labels(
     if Nx_det == Nx_illum:
         logger.info(
             f'Generated {N_src} illumination/label pairs from R-matrix '
-            f'(Nx={Nx_det}, sigma={sigma}, mode={"gaussian" if use_gaussian else "delta"})'
+            f'(Nx={Nx_det}, sigma={sigma}, spot_offset=({dy},{dx}), '
+            f'mode={"gaussian" if use_gaussian else "delta"})'
         )
     else:
         logger.info(
             f'Generated {N_src} illumination/label pairs from non-square R-matrix '
             f'(illum={Nx_illum}x{Nx_illum}, labels={Nx_det}x{Nx_det}, '
-            f'sigma={sigma}, mode={"gaussian" if use_gaussian else "delta"})'
+            f'sigma={sigma}, spot_offset=({dy},{dx}), '
+            f'mode={"gaussian" if use_gaussian else "delta"})'
         )
     return illum, labels
 

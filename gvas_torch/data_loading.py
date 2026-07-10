@@ -184,15 +184,22 @@ def load_dataset(
 
     cass = torch.from_numpy(cass_np).to(device=device, dtype=torch.complex64)
 
-    # Pad CASS to crop_size if smaller (e.g. 160 -> 200 when extending illumination)
+    # Match CASS to crop_size: pad up if smaller (e.g. 160 -> 200 when extending
+    # illumination), centre-crop down if larger (e.g. a 320 depth-scan stack ->
+    # 200). The model predicts CASS at crop_size, so the target must equal it.
     crop = cfg.grid.resolved_crop()
     _, ch, cw = cass.shape
     if ch < crop or cw < crop:
-        py = crop - ch
-        px = crop - cw
+        py = max(0, crop - ch)
+        px = max(0, crop - cw)
         py0, py1 = py // 2, py - py // 2
         px0, px1 = px // 2, px - px // 2
         cass = F.pad(cass, (px0, px1, py0, py1), mode="constant", value=0.0)
+        _, ch, cw = cass.shape
+    if ch > crop or cw > crop:
+        y0 = (ch - crop) // 2
+        x0 = (cw - crop) // 2
+        cass = cass[:, y0:y0 + crop, x0:x0 + crop].contiguous()
 
     # Distances — either from a depths file or from distance_range indices.
     if d.depths_file:
