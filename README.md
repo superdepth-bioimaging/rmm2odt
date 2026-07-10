@@ -249,8 +249,6 @@ rmm2odt/
   odt/                # vendored+pruned stage 3  (entry: reconstruct.reconstruct)
   configs/
     reproduce_sample5.yaml     # portable, env-var paths — start here
-    sample5_251208_medium.yaml # the original absolute-path config for this sample
-    sample5_251208.yaml        # faster/lower-quality "shakedown" variant
     example_pipeline.yaml      # annotated template
   requirements.txt
 ```
@@ -333,9 +331,10 @@ warned-and-skipped, not fatal.
 - **`torch.cuda.is_available()` is False** — you installed a CPU-only PyTorch.
   Reinstall a CUDA build matching your driver (see step 3).
 - **GPU out-of-memory during stages 1–3** — your card has less VRAM than the
-  reference run. Try `configs/sample5_251208.yaml` (the lighter "shakedown"
-  variant), or lower the sizes in the config (`multilayer.scanning_size`,
-  `gvas.grid`, `odt.geom`).
+  reference run. Lower the sizes in the config (`multilayer.scanning_size`,
+  `gvas.grid`, `odt.geom`) and/or the epoch/iteration counts
+  (`multilayer.base_epochs`, `scan_epochs`, `gvas.optimisation.n_epochs`,
+  `odt.optim.n_iter`).
 - **Out-of-memory during render (`fig2c`/`fig3d`)** — these load the full
   ~4.7 GB rrmat; the `fig3d` propagated-rrmat step needs several GB more. Free
   RAM, or set `render.panels.fig3d_rrmat: false` to skip the heavy rows.

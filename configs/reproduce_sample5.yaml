@@ -1,8 +1,8 @@
 # Reproduce the sample5 (251208) paper figures with rmm2odt.
 #
-# This is the portable version of configs/sample5_251208_medium.yaml — the run
-# that produced the published panels — with data paths driven by environment
-# variables so a new user only has to point at their downloaded data:
+# This is the portable, env-var-driven config for the run that produced the
+# published panels — data paths come from environment variables so a new user
+# only has to point at their downloaded data:
 #
 #   export RMM2ODT_DATA=/absolute/path/to/downloaded/figshare/data
 #   export RMM2ODT_OUT=/absolute/path/for/outputs      # optional; default ./results/sample5_251208
