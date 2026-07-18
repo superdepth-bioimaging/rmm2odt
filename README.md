@@ -353,3 +353,7 @@ warned-and-skipped, not fatal.
 
 If you use this pipeline, please cite the associated paper and the Figshare
 dataset. *(Add the citation / BibTeX here before publishing.)*
+
+## License
+
+Code in this repository is released under the [MIT License](LICENSE).
