@@ -347,12 +347,15 @@ warned-and-skipped, not fatal.
 
 ## Data & code availability
 
-- **Code**: this repository (GitHub).
+- **Code**: this repository — https://github.com/superdepth-bioimaging/rmm2odt
+  Archived release (`v1.0.0`): https://doi.org/10.5281/zenodo.21431520
+  (concept DOI, always resolves to the latest version: https://doi.org/10.5281/zenodo.21431519)
 - **Data**: Figshare — https://doi.org/10.6084/m9.figshare.32904746
   (`rrmat.mat` + `279x150x150_angle_illumination.mat`).
 
-If you use this pipeline, please cite the associated paper and the Figshare
-dataset. *(Add the citation / BibTeX here before publishing.)*
+If you use this pipeline, please cite the associated paper, the archived code
+release, and the Figshare dataset. *(Add the citation / BibTeX here before
+publishing.)*
 
 ## License
 
