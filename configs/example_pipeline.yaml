@@ -15,10 +15,10 @@ optics:
   # NA_model: 1.0            # optional; defaults to NA
 
 paths:
-  rrmat: "/home/hoangku/data/.../rrmat.mat"           # stage-1 input (square HDF5 R-matrix)
-  illumination_file: "/home/hoangku/data/experimental_data/517nm/279x150x150_angle_illumination.mat"
+  rrmat: "/home/user/data/.../rrmat.mat"           # stage-1 input (square HDF5 R-matrix)
+  illumination_file: "/home/user/data/experimental_data/517nm/279x150x150_angle_illumination.mat"
   illumination_mat_key: angle_illumination
-  output_root: "/home/hoangku/data/.../rmm2odt_run"   # all stage outputs go here
+  output_root: "/home/user/data/.../rmm2odt_run"   # all stage outputs go here
 
 runtime:
   device: cuda               # cuda | cpu
